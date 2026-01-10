@@ -1,0 +1,88 @@
+# ESP32 Ambient Cove Lighting Firmware - Codebase Summary
+
+## Overview
+This firmware is designed for an ESP32-based ambient lighting system using addressable LED strips (e.g., WS2812B). It supports multiple lighting modes, network control via UDP, and state management for smooth transitions and effects.
+
+---
+
+## Main Components
+
+### 1. main.ino
+- **Purpose:** Entry point for the firmware. Handles setup, main loop, and UDP packet processing.
+- **Key Functions:**
+  - `setup()`: Initializes serial, WiFi, UDP, LEDs, and state.
+  - `loop()`: Handles UDP packets, updates state, and triggers rendering at a fixed interval.
+  - `handle_udp()`: Receives and processes UDP packets to update the lighting state.
+
+### 2. config.h
+- **Purpose:** Configuration constants for the project.
+- **Key Defines:**
+  - `LED_PIN`: GPIO 5 (data pin for LED strip)
+  - `LED_TYPE`: WS2812B
+  - `COLOR_ORDER`: GRB
+  - `NUM_LEDS`: 600 (number of LEDs in the strip)
+  - Other constants for brightness, speed, etc.
+
+### 3. state.h / state.cpp
+- **Purpose:** State management for target and rendered LED states.
+- **Key Structures:**
+  - `Packet`: Structure for incoming UDP data.
+  - `TargetState`: Desired state from network or user input.
+  - `RenderState`: Smoothed/animated state for rendering.
+- **Key Variables:**
+  - `TargetState targetState`: Global, holds the current target state.
+  - `RenderState renderState`: Global, holds the current render state.
+- **Key Functions:**
+  - `initState()`: Initializes state variables.
+  - `updateStateFromPacket(const Packet&)`: Updates target state from UDP packet.
+  - `smoothState(float dt)`: Smooths transitions between states.
+
+### 4. renderer.h / renderer.cpp
+- **Purpose:** LED rendering logic and FastLED setup.
+- **Key Variables:**
+  - `CRGB leds[NUM_LEDS]`: Array for LED colors.
+- **Key Functions:**
+  - `setupLEDs()`: Initializes FastLED and clears LEDs.
+  - `renderFrame()`: Renders the current frame based on the selected mode and shows it on the strip.
+
+### 5. modes.h / modes.cpp
+- **Purpose:** Defines multiple lighting modes and their rendering logic.
+- **Key Functions:**
+  - `renderMode1()` to `renderMode5()`: Each function implements a different lighting effect, using the current state and FastLED's `fl::clamp` for color/brightness limits.
+
+### 6. network.h / network.cpp
+- **Purpose:** Handles WiFi and UDP communication.
+- **Key Functions:**
+  - `setupWiFi()`: Connects to WiFi.
+  - `setupUDP()`: Initializes UDP communication.
+  - `receivePacket(Packet&)`: Receives and parses UDP packets.
+
+### 7. storage.h / storage.cpp
+- **Purpose:** (If implemented) Handles persistent storage for settings or state.
+
+---
+
+## Key Details
+- **LED Data Pin:** GPIO 5 (as `LED_PIN` in config.h)
+- **LED Type:** WS2812B (addressable RGB)
+- **Network:** WiFi UDP control, with fallback mode if no packets are received.
+- **State Smoothing:** Uses exponential moving average for smooth transitions.
+- **Modes:** Multiple visual effects, each in its own function.
+- **Error Handling:** Codebase is now error-free and compatible with ESP32 Arduino core 2.0.17.
+
+---
+
+## How to Test
+1. Connect the LED strip's data line to GPIO 5 on the ESP32.
+2. Power the ESP32 and the LED strip (ensure sufficient current for the strip).
+3. Upload the firmware.
+4. Open Serial Monitor for debug output.
+5. Send UDP packets matching the `Packet` structure to control the lights.
+6. Observe the LED strip for mode changes and effects.
+
+---
+
+## Notes
+- The code is modular, with clear separation between state management, rendering, networking, and mode logic.
+- All state variables and functions are properly defined and initialized.
+- The firmware is ready for further extension (e.g., adding new modes or features).

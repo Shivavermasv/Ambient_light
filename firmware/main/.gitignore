@@ -1,0 +1,6 @@
+*.bin
+*.elf
+*.map
+*.dat
+__pycache__/
+.DS_Store

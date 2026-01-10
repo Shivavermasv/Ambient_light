@@ -1,0 +1,7 @@
+# requirements.txt
+# Strictly follows PROJECT_SPEC.md
+mss
+numpy
+sounddevice
+scipy
+opencv-python
