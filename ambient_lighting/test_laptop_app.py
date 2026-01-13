@@ -30,6 +30,18 @@ class TestScreenSampler(unittest.TestCase):
         rgb = self.sampler.weighted_mean_color(hsv, img_cropped)
         self.assertEqual(rgb.shape, (3,))
 
+    def test_bright_saturated_fallback_handles_test_patterns(self):
+        # Pure bright red would be excluded by the strict V<=0.92 mask.
+        # Ensure we still return the correct color via the saturation-weighted fallback.
+        self.sampler.last_color = np.array([1, 2, 3], dtype=np.float32)
+        img_cropped = np.zeros((10, 10, 3), dtype=np.uint8)
+        img_cropped[..., 0] = 255  # R
+        hsv = np.zeros((10, 10, 3), dtype=np.float32)
+        hsv[..., 1] = 1.0  # S
+        hsv[..., 2] = 1.0  # V
+        rgb = self.sampler.weighted_mean_color(hsv, img_cropped)
+        self.assertTrue(np.allclose(rgb, np.array([255, 0, 0], dtype=np.float32), atol=1.0))
+
 class TestAudioFFT(unittest.TestCase):
     def setUp(self):
         self.audio = AudioFFT()

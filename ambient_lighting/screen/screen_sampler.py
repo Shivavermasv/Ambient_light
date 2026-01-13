@@ -93,8 +93,19 @@ class ScreenSampler:
         weights[mask] = S[mask] * np.power(1 - V[mask], 1.5)
         weights_sum = np.sum(weights)
         if weights_sum == 0:
-            # Fallback: use last color
-            print("Weighted mean: no valid pixels, using last color.")
+            # Second-pass fallback for bright, highly-saturated scenes (e.g., RGB test patterns).
+            # Keep ignoring low-saturation whites, but do not reject pixels purely because V is high.
+            mask2 = (S >= 0.08)
+            if np.any(mask2):
+                weights2 = np.zeros_like(S)
+                weights2[mask2] = S[mask2]
+                weights_sum2 = np.sum(weights2)
+                if weights_sum2 > 0:
+                    rgb = img_cropped.astype(np.float32)
+                    weighted_rgb = np.tensordot(weights2, rgb, axes=([0, 1], [0, 1])) / weights_sum2
+                    return weighted_rgb
+
+            # Final fallback: use last color (matches original behavior).
             return self.last_color.copy()
         # Apply weights to RGB
         rgb = img_cropped.astype(np.float32)
