@@ -10,7 +10,14 @@ CRGB leds[NUM_LEDS];
 
 void setupLEDs() {
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-    FastLED.setBrightness(0);
+    #if DISABLE_POWER_LIMIT
+    FastLED.setMaxPowerInVoltsAndMilliamps(LED_VOLTAGE, 100000); // effectively uncapped; ensure PSU/wiring are safe
+    #else
+    FastLED.setMaxPowerInVoltsAndMilliamps(LED_VOLTAGE, POWER_LIMIT_MA);
+    #endif
+    FastLED.setCorrection(UncorrectedColor);
+    FastLED.setDither(1);
+        FastLED.setBrightness(255); // start at full scale; per-mode calls will adjust dynamically
     FastLED.clear();
     FastLED.show();
 }

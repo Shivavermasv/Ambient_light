@@ -52,12 +52,14 @@ class TestPacketBuilder(unittest.TestCase):
             'brightness': 80,
             'motion_energy': 100,
             'motion_speed': 0.5,
-            'direction': 1
+            'direction': 1,
+            'frame_id': 7,
         }
         packet = self.builder.build(data)
         self.assertEqual(len(packet), 12)
         self.assertEqual(packet[0], 0xAA)
         self.assertEqual(packet[11], 0x55)
+        self.assertEqual(packet[9], 7)
         # Checksum
         checksum = 0
         for b in packet[1:10]:

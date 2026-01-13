@@ -12,6 +12,7 @@ struct Packet {
     uint8_t motion_energy;
     uint8_t motion_speed;
     uint8_t motion_direction;
+    uint8_t frame_id;
 };
 
 struct TargetState {
@@ -38,6 +39,10 @@ extern TargetState targetState;
 extern RenderState renderState;
 
 void initState();
-void updateStateFromPacket(const Packet &packet);
+void updateStateFromPacket(const Packet &packet, unsigned long nowMs);
 void smoothState(float dt);
+
+// Packet-time driven animation helpers
+void snapRenderStateToTarget(bool resetPhase);
+void advanceRenderPhase(float dt_s, float packet_dt_s);
 #endif // STATE_H

@@ -3,5 +3,6 @@
 mss
 numpy
 sounddevice
+soundcard
 scipy
 opencv-python

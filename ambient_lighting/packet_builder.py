@@ -19,7 +19,8 @@ class PacketBuilder:
         packet[6] = np.clip(int(data.get('motion_energy', 0)), 0, 180)
         packet[7] = np.clip(int(data.get('motion_speed', 0.15) * 100), 0, 255)
         packet[8] = int(data.get('direction', 0))
-        packet[9] = 0x00  # Reserved
+        # Byte 9: frame_id (0-255 wrap). Used for loss/reorder detection on ESP32.
+        packet[9] = int(data.get('frame_id', 0)) & 0xFF
         # Checksum: XOR bytes 1-9
         packet[10] = np.bitwise_xor.reduce(packet[1:10])
         packet[11] = 0x55  # Footer

@@ -27,7 +27,7 @@ data = {
     'base_color': [0, 0, 0],
     'motion_energy': 0,
     'motion_speed': 0.15,
-    'direction': 0,
+    'direction': 128,
     'brightness': 70,
     'mode': 1
 }

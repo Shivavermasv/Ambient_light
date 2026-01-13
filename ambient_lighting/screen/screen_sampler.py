@@ -11,7 +11,7 @@ import cv2
 import time
 
 class ScreenSampler:
-    def __init__(self, downscale_size=(64, 36), crop_top=0.07, crop_bottom=0.13, ema_ms=600):
+    def __init__(self, downscale_size=(64, 36), crop_top=0.07, crop_bottom=0.13, ema_ms=600, desat_amount=0.12, dark_boost=False, dark_boost_v_thresh=0.25, dark_boost_strength=0.15):
         """
         Initialize the screen sampler.
         Args:
@@ -24,6 +24,10 @@ class ScreenSampler:
         self.crop_top = crop_top
         self.crop_bottom = crop_bottom
         self.ema_alpha = self._compute_ema_alpha(ema_ms)
+        self.desat_amount = desat_amount
+        self.dark_boost = dark_boost
+        self.dark_boost_v_thresh = dark_boost_v_thresh
+        self.dark_boost_strength = dark_boost_strength
         self.last_color = np.array([0, 0, 0], dtype=np.float32)
         self.last_capture_success = True
 
@@ -97,6 +101,33 @@ class ScreenSampler:
         weighted_rgb = np.tensordot(weights, rgb, axes=([0, 1], [0, 1])) / weights_sum
         return weighted_rgb
 
+    def weighted_mean_color_regions(self, hsv, img_cropped, regions=3):
+        """
+        Compute weighted mean color per horizontal region (e.g., left/center/right).
+        Returns list of RGB colors (float32) and corresponding weight sums.
+        """
+        S = hsv[..., 1]
+        V = hsv[..., 2]
+        mask = (V <= 0.92) & (S >= 0.08)
+        weights = np.zeros_like(S)
+        weights[mask] = S[mask] * np.power(1 - V[mask], 1.5)
+        h, w = S.shape
+        region_colors = []
+        region_weights = []
+        for i in range(regions):
+            x0 = int(i * w / regions)
+            x1 = int((i + 1) * w / regions)
+            w_reg = weights[:, x0:x1]
+            rgb_reg = img_cropped[:, x0:x1, :].astype(np.float32)
+            w_sum = np.sum(w_reg)
+            if w_sum == 0:
+                region_colors.append(None)
+                region_weights.append(0.0)
+            else:
+                region_colors.append(np.tensordot(w_reg, rgb_reg, axes=([0, 1], [0, 1])) / w_sum)
+                region_weights.append(float(w_sum))
+        return region_colors, region_weights
+
     def desaturate(self, rgb, amount=0.12):
         """
         Desaturate the color by the given amount.
@@ -112,6 +143,19 @@ class ScreenSampler:
         # Convert back to RGB
         rgb_desat = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)[0, 0]
         return rgb_desat.astype(np.float32)
+
+    def boost_dark(self, rgb):
+        if not self.dark_boost:
+            return rgb
+        hsv = cv2.cvtColor(np.uint8([[rgb]]), cv2.COLOR_RGB2HSV).astype(np.float32)
+        v_norm = hsv[0, 0, 2] / 255.0
+        if v_norm < self.dark_boost_v_thresh:
+            factor = 1.0 + self.dark_boost_strength * (1.0 - v_norm / max(self.dark_boost_v_thresh, 1e-3))
+            hsv[0, 0, 1] = np.clip(hsv[0, 0, 1] * factor, 0, 255)
+            hsv[0, 0, 2] = np.clip(hsv[0, 0, 2] * (1.0 + 0.1 * factor), 0, 255)
+            rgb_boosted = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)[0, 0]
+            return rgb_boosted.astype(np.float32)
+        return rgb
 
     def smooth_color(self, rgb):
         """
@@ -137,9 +181,35 @@ class ScreenSampler:
             return self.last_color.copy()
         hsv, img_cropped = self.process_image(img)
         rgb = self.weighted_mean_color(hsv, img_cropped)
-        rgb = self.desaturate(rgb, amount=0.12)
+        rgb = self.boost_dark(rgb)
+        rgb = self.desaturate(rgb, amount=self.desat_amount)
         rgb = self.smooth_color(rgb)
         return rgb
+
+    def get_screen_data(self, regions=3):
+        """
+        Returns tuple: (final_color, region_colors, region_weights)
+        final_color is smoothed; region_colors are processed (boost+desat) but unsmoothed.
+        """
+        img = self.capture_screen()
+        if img is None:
+            return self.last_color.copy(), [], []
+        hsv, img_cropped = self.process_image(img)
+        rgb = self.weighted_mean_color(hsv, img_cropped)
+        region_colors, region_weights = self.weighted_mean_color_regions(hsv, img_cropped, regions=regions)
+
+        def _process(c):
+            if c is None:
+                return None
+            c = self.boost_dark(c)
+            c = self.desaturate(c, amount=self.desat_amount)
+            return c
+
+        region_colors = [_process(c) for c in region_colors]
+        rgb = self.boost_dark(rgb)
+        rgb = self.desaturate(rgb, amount=self.desat_amount)
+        rgb = self.smooth_color(rgb)
+        return rgb, region_colors, region_weights
 
 if __name__ == "__main__":
     sampler = ScreenSampler()

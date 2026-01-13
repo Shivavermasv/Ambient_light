@@ -1,0 +1,2 @@
+to run 
+powershell -> cd -> E:/ambient_light_project/.venv/Scripts/python.exe ambient_lighting/main_desktop.py

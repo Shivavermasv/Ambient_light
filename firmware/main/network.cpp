@@ -10,12 +10,20 @@ WiFiUDP udp;
 void setupWiFi() {
     Serial.println("[WiFi] Connecting...");
     WiFi.mode(WIFI_STA);
+    // Disable modem sleep for more reliable UDP receive
+    WiFi.setSleep(false);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     while (WiFi.status() != WL_CONNECTED) {
         delay(200);
         Serial.print(".");
     }
     Serial.println("\n[WiFi] Connected");
+    Serial.print("[WiFi] SSID: ");
+    Serial.println(WIFI_SSID);
+    Serial.print("[WiFi] IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("[WiFi] BSSID: ");
+    Serial.println(WiFi.BSSIDstr());
 }
 
 void setupUDP() {
@@ -43,5 +51,6 @@ bool receivePacket(Packet &packet) {
     packet.motion_energy = buf[6];
     packet.motion_speed = buf[7];
     packet.motion_direction = buf[8];
+    packet.frame_id = buf[9];
     return true;
 }
