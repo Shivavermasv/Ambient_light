@@ -13,17 +13,12 @@ void renderMode1() {
         float x = (i - NUM_LEDS/2) / 80.0f;
         float mod = 0.18f * sinf(x + phase);
         leds[i] = CRGB(
-            fl::clamp(renderState.render_color.r * (1.12f + mod), 0.0f, float(MAX_R)),
-            fl::clamp(renderState.render_color.g * (1.12f + mod), 0.0f, float(MAX_G)),
-            fl::clamp(renderState.render_color.b * (1.12f + mod), 0.0f, float(MAX_B))
+            fl::clamp(renderState.render_color.r * (1.0f + mod), 0.0f, float(MAX_R)),
+            fl::clamp(renderState.render_color.g * (1.0f + mod), 0.0f, float(MAX_G)),
+            fl::clamp(renderState.render_color.b * (1.0f + mod), 0.0f, float(MAX_B))
         );
     }
-    float b = renderState.render_brightness;
-#if !STRICT_PACKET_BRIGHTNESS
-    b = b * BRIGHTNESS_GAIN;
-    if (b < 96.0f) b = 96.0f; // higher floor for visibility
-#endif
-    FastLED.setBrightness((uint8_t)std::min(255.0f, std::max(0.0f, b)));
+    FastLED.setBrightness(renderState.render_brightness);
 }
 
 void renderMode2() {
@@ -31,21 +26,17 @@ void renderMode2() {
     float phase = renderState.render_phase;
     for (int i = 0; i < NUM_LEDS; ++i) {
         float dist = abs(i - NUM_LEDS/2) / 30.0f;
-        float motion = renderState.render_motion_energy;
-        float ripple_amp = 0.75f * (motion / 180.0f); // motion_energy is 0..180 from laptop
-        float ripple = ripple_amp * sinf(dist - phase);
+        float m = fl::clamp(renderState.render_motion_energy / 180.0f, 0.0f, 1.0f);
+        float amp = 0.15f + 0.50f * m;
+        float ripple = sinf(dist - phase) * amp;
+        float base = 0.85f;
         leds[i] = CRGB(
-            fl::clamp(renderState.render_color.r * (1.15f + ripple), 0.0f, float(MAX_R)),
-            fl::clamp(renderState.render_color.g * (1.15f + ripple), 0.0f, float(MAX_G)),
-            fl::clamp(renderState.render_color.b * (1.15f + ripple), 0.0f, float(MAX_B))
+            fl::clamp(renderState.render_color.r * (base + ripple), 0.0f, float(MAX_R)),
+            fl::clamp(renderState.render_color.g * (base + ripple), 0.0f, float(MAX_G)),
+            fl::clamp(renderState.render_color.b * (base + ripple), 0.0f, float(MAX_B))
         );
     }
-    float b = renderState.render_brightness;
-#if !STRICT_PACKET_BRIGHTNESS
-    b = b * BRIGHTNESS_GAIN * 1.10f;
-    if (b < 110.0f) b = 110.0f;
-#endif
-    FastLED.setBrightness((uint8_t)std::min(255.0f, std::max(0.0f, b)));
+    FastLED.setBrightness(renderState.render_brightness);
 }
 
 void renderMode3() {
@@ -63,14 +54,7 @@ void renderMode4() {
             fl::clamp(renderState.render_color.b * breath, 0.0f, float(MAX_B))
         );
     }
-    float b = renderState.render_brightness;
-#if !STRICT_PACKET_BRIGHTNESS
-    if (b < 110.0f) b = 110.0f;
-#endif
-#if FORCE_MAX_BRIGHTNESS
-    b = 255.0f;
-#endif
-    FastLED.setBrightness((uint8_t)std::min(255.0f, std::max(0.0f, b)));
+    FastLED.setBrightness(renderState.render_brightness);
 }
 
 void renderMode5() {

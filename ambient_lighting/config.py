@@ -7,7 +7,7 @@ Strictly follows PROJECT_SPEC.md.
 class Config:
     def __init__(self):
         # UDP settings
-        self.udp_ip = '192.168.0.104'  # ESP32 IP (updated to match device)
+        self.udp_ip = '192.168.0.100'  # ESP32 IP (updated to match device)
         self.udp_port = 4210
         self.udp_rate_hz = 25
         self.debug_udp_packets = False
@@ -94,6 +94,13 @@ class Config:
         self.audio_motion_smooth_ms = 250  # slightly quicker smoothing for responsiveness
         self.audio_motion_silence_hold_s = 1.2  # still clamps, but sooner responsiveness after sound
         self.audio_motion_speed_cap = 0.65  # cap speed in modes 2/3 for safety (old hard-coded 0.9)
+
+        # Mode 2: ensure visible forward/back travel (direction alternates while audio is active)
+        self.enable_audio_direction_oscillation = True
+        self.audio_direction_period_s = 6.0
+        self.audio_direction_motion_threshold = 6
+        self.audio_direction_left = 32
+        self.audio_direction_right = 224
 
         # Speed ramp limiting (units: speed/sec). Helps prevent sudden jumps that can stress strips.
         self.motion_speed_ramp_per_s = 2.5

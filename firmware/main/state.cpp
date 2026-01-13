@@ -76,9 +76,19 @@ void updateStateFromPacket(const Packet &packet, unsigned long nowMs) {
     targetState.r = std::min(packet.r, static_cast<uint8_t>(MAX_R));
     targetState.g = std::min(packet.g, static_cast<uint8_t>(MAX_G));
     targetState.b = std::min(packet.b, static_cast<uint8_t>(MAX_B));
+
+#if PACKET_BRIGHTNESS_ZERO_IS_NOHINT
+    if (packet.brightness == 0 && packet.mode != 5) {
+        // keep previous brightness
+    } else {
+        targetState.brightness = std::min(packet.brightness, static_cast<uint8_t>(BRIGHTNESS_CAP));
+    }
+#else
     targetState.brightness = std::min(packet.brightness, static_cast<uint8_t>(BRIGHTNESS_CAP));
-    // Laptop clamps motion_energy to 0..180; keep the same scale here.
-    targetState.motion_energy = std::min(packet.motion_energy, static_cast<uint8_t>(180));
+#endif
+
+    // Laptop often uses 0..180, but allow full 0..255 in case of future tuning.
+    targetState.motion_energy = packet.motion_energy;
     targetState.motion_speed = std::min(packet.motion_speed, static_cast<uint8_t>(MOTION_SPEED_CAP));
     targetState.motion_direction = stableDirection;
 

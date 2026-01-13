@@ -20,6 +20,7 @@ class TestScreenSampler(unittest.TestCase):
     def test_screen_failure_reuse_last_color(self):
         # Simulate screen capture failure
         self.sampler.last_color = np.array([123, 45, 67], dtype=np.float32)
+        self.sampler.capture_screen = lambda: None
         color = self.sampler.get_screen_color()
         self.assertTrue(np.allclose(color, self.sampler.last_color))
 

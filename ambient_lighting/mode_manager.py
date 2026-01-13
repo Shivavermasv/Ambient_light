@@ -213,4 +213,20 @@ class ModeManager:
             else:
                 self.drift_last_time = now
 
+        # Mode 2: force a gentle forward/back travel by alternating direction
+        # while audio motion is active. This prevents "flicker only" when direction
+        # is otherwise neutral (128) for stability.
+        if mode == 2 and bool(getattr(self.config, 'enable_audio_direction_oscillation', False)):
+            threshold = float(getattr(self.config, 'audio_direction_motion_threshold', 6))
+            if motion_energy_q >= threshold:
+                period = float(getattr(self.config, 'audio_direction_period_s', 6.0))
+                period = max(period, 0.5)
+                phase = (now % period) / period
+                if phase < 0.5:
+                    data['direction'] = int(getattr(self.config, 'audio_direction_left', 32)) & 0xFF
+                else:
+                    data['direction'] = int(getattr(self.config, 'audio_direction_right', 224)) & 0xFF
+            else:
+                data['direction'] = 128
+
         return self.packet_builder.build(data)
