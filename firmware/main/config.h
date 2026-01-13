@@ -50,3 +50,14 @@
 #define DISABLE_POWER_LIMIT 1
 #endif
 #endif
+
+// Color calibration (FastLED)
+// Many WS2812B strips look overly green/blue with UncorrectedColor.
+// These defaults add "depth" by warming and balancing channels.
+#ifndef LED_CORRECTION
+#define LED_CORRECTION TypicalLEDStrip
+#endif
+
+#ifndef LED_TEMPERATURE
+#define LED_TEMPERATURE Tungsten40W
+#endif

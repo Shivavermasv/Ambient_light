@@ -15,9 +15,10 @@ void setupLEDs() {
     #else
     FastLED.setMaxPowerInVoltsAndMilliamps(LED_VOLTAGE, POWER_LIMIT_MA);
     #endif
-    FastLED.setCorrection(UncorrectedColor);
+    FastLED.setCorrection(LED_CORRECTION);
+    FastLED.setTemperature(LED_TEMPERATURE);
     FastLED.setDither(1);
-        FastLED.setBrightness(255); // start at full scale; per-mode calls will adjust dynamically
+    FastLED.setBrightness(255); // start at full scale; per-mode calls will adjust dynamically
     FastLED.clear();
     FastLED.show();
 }
