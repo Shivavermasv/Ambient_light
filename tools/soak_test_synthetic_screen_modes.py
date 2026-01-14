@@ -58,6 +58,17 @@ def make_frame_pattern(t: float, w: int = 64, h: int = 36) -> np.ndarray:
         img[:, x1:, :] = np.array([255, 255, 255], dtype=np.uint8)
         return img
 
+    if phase == 9:
+        # Moving dominant region to exercise spatial bias + direction mapping
+        img = np.zeros((h, w, 3), dtype=np.uint8)
+        third = w // 3
+        idx = int((t * 0.8) % 3)
+        x0 = idx * third
+        x1 = (idx + 1) * third if idx < 2 else w
+        img[:, :, :] = np.array([25, 25, 25], dtype=np.uint8)
+        img[:, x0:x1, :] = np.array([0, 140, 255], dtype=np.uint8)  # cyan/blue dominant
+        return img
+
     if phase in (6, 7, 8):
         # Smooth gradient sweep
         img = np.zeros((h, w, 3), dtype=np.uint8)
@@ -84,6 +95,49 @@ def run_sampler_on_frame(sampler: ScreenSampler, img: np.ndarray) -> np.ndarray:
     return rgb
 
 
+def run_sampler_with_spatial_bias(
+    sampler: ScreenSampler,
+    img: np.ndarray,
+    regions: int,
+    blend: float,
+    stable_frames_required: int,
+    last_dom_idx,
+    dom_streak: int,
+    stable_dom_idx,
+):
+    """Approximate main_desktop.py spatial-bias behavior deterministically."""
+    hsv, cropped = sampler.process_image(img)
+    base = sampler.weighted_mean_color(hsv, cropped)
+    region_colors, region_weights = sampler.weighted_mean_color_regions(hsv, cropped, regions=regions)
+
+    if region_weights and max(region_weights) > 0:
+        idx = int(np.argmax(region_weights))
+        if last_dom_idx is None or idx != last_dom_idx:
+            last_dom_idx = idx
+            dom_streak = 1
+        else:
+            dom_streak += 1
+        if dom_streak >= stable_frames_required:
+            stable_dom_idx = idx
+
+        dom_color = region_colors[idx] if region_colors[idx] is not None else base
+        base = (1 - blend) * base + blend * dom_color
+
+        if regions >= 3:
+            dir_map = {0: 32, 1: 128, 2: 224}
+            use_idx = stable_dom_idx if stable_dom_idx is not None else idx
+            direction = int(dir_map.get(use_idx, 128))
+        else:
+            direction = 128
+    else:
+        direction = 128
+
+    base = sampler.boost_dark(base)
+    base = sampler.desaturate(base, amount=sampler.desat_amount)
+    base = sampler.smooth_color(base)
+    return base, direction, last_dom_idx, dom_streak, stable_dom_idx
+
+
 def validate_packet(packet_bytes: bytes) -> None:
     p = np.frombuffer(packet_bytes, dtype=np.uint8)
     if int(p[0]) != 0xAA or int(p[11]) != 0x55:
@@ -99,6 +153,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seconds', type=float, default=180.0)
     ap.add_argument('--fps', type=float, default=25.0)
+    ap.add_argument('--spatial-bias', action='store_true', help='Simulate spatial bias + direction hysteresis (like main_desktop.py).')
     args = ap.parse_args()
 
     cfg = Config()
@@ -131,12 +186,31 @@ def main():
     packets = 0
     last_print = time.time()
 
+    # Spatial bias hysteresis state
+    last_dom_idx = None
+    dom_streak = 0
+    stable_dom_idx = None
+    stable_frames_required = 3
+
     while time.time() < end:
         now = time.time()
         t = args.seconds - (end - now)
 
         img = make_frame_pattern(t)
-        color = run_sampler_on_frame(sampler, img)
+        if args.spatial_bias and getattr(cfg, 'enable_spatial_bias', False):
+            color, direction, last_dom_idx, dom_streak, stable_dom_idx = run_sampler_with_spatial_bias(
+                sampler,
+                img,
+                regions=int(getattr(cfg, 'spatial_regions', 3)),
+                blend=float(getattr(cfg, 'spatial_bias_blend', 0.35)),
+                stable_frames_required=stable_frames_required,
+                last_dom_idx=last_dom_idx,
+                dom_streak=dom_streak,
+                stable_dom_idx=stable_dom_idx,
+            )
+        else:
+            color = run_sampler_on_frame(sampler, img)
+            direction = 128
 
         delta = np.abs(color - last_color).sum()
         screen_motion = float(np.clip(delta * 0.8, 0, 180))
@@ -152,7 +226,7 @@ def main():
             'screen_motion_energy': motion_value,
             'audio_motion_energy': audio_energy,
             'audio_centroid': audio_centroid,
-            'direction': 128,
+            'direction': direction,
         }
 
         for mode in (1, 2, 3, 4, 5):
@@ -164,8 +238,8 @@ def main():
 
         if now - last_print > 5.0:
             print(
-                f"t={t:6.1f}s color={list(np.round(color).astype(int))} screen_motion={motion_value:6.1f} "
-                f"audio={audio_energy:6.1f} packets={packets}"
+                f"t={t:6.1f}s color={list(np.round(color).astype(int))} dir={int(direction)} "
+                f"screen_motion={motion_value:6.1f} audio={audio_energy:6.1f} packets={packets}"
             )
             last_print = now
 
