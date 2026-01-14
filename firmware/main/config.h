@@ -77,5 +77,5 @@
 #endif
 
 #ifndef LED_TEMPERATURE
-#define LED_TEMPERATURE Tungsten40W
+#define LED_TEMPERATURE DirectSunlight
 #endif
