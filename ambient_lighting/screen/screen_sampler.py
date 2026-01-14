@@ -54,7 +54,6 @@ class ScreenSampler:
                 return img
         except Exception as e:
             # Handle screen capture failure gracefully
-            print(f"Screen capture failed: {e}")
             self.last_capture_success = False
             return None
 
@@ -94,7 +93,7 @@ class ScreenSampler:
         weights_sum = np.sum(weights)
         if weights_sum == 0:
             # Second-pass fallback for bright, highly-saturated scenes (e.g., RGB test patterns).
-            # Keep ignoring low-saturation whites, but do not reject pixels purely because V is high.
+            # Keep ignoring low-saturation whites, but don't reject pixels purely because V is high.
             mask2 = (S >= 0.08)
             if np.any(mask2):
                 weights2 = np.zeros_like(S)
@@ -112,11 +111,24 @@ class ScreenSampler:
         weighted_rgb = np.tensordot(weights, rgb, axes=([0, 1], [0, 1])) / weights_sum
         return weighted_rgb
 
+    def desaturate(self, rgb, amount=0.12):
+        """
+        Desaturate the color by the given amount.
+        Args:
+            rgb: Input RGB color (float32, range 0-255)
+            amount: Fraction to desaturate (0-1)
+        Returns:
+            np.ndarray: Desaturated RGB color
+        """
+        # Convert to HSV
+        hsv = cv2.cvtColor(np.uint8([[rgb]]), cv2.COLOR_RGB2HSV).astype(np.float32)
+        hsv[0, 0, 1] *= (1 - amount)
+        # Convert back to RGB
+        rgb_desat = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)[0, 0]
+        return rgb_desat.astype(np.float32)
+
     def weighted_mean_color_regions(self, hsv, img_cropped, regions=3):
-        """
-        Compute weighted mean color per horizontal region (e.g., left/center/right).
-        Returns list of RGB colors (float32) and corresponding weight sums.
-        """
+        """Compute weighted mean color per horizontal region (left/center/right)."""
         S = hsv[..., 1]
         V = hsv[..., 2]
         mask = (V <= 0.92) & (S >= 0.08)
@@ -138,22 +150,6 @@ class ScreenSampler:
                 region_colors.append(np.tensordot(w_reg, rgb_reg, axes=([0, 1], [0, 1])) / w_sum)
                 region_weights.append(float(w_sum))
         return region_colors, region_weights
-
-    def desaturate(self, rgb, amount=0.12):
-        """
-        Desaturate the color by the given amount.
-        Args:
-            rgb: Input RGB color (float32, range 0-255)
-            amount: Fraction to desaturate (0-1)
-        Returns:
-            np.ndarray: Desaturated RGB color
-        """
-        # Convert to HSV
-        hsv = cv2.cvtColor(np.uint8([[rgb]]), cv2.COLOR_RGB2HSV).astype(np.float32)
-        hsv[0, 0, 1] *= (1 - amount)
-        # Convert back to RGB
-        rgb_desat = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)[0, 0]
-        return rgb_desat.astype(np.float32)
 
     def boost_dark(self, rgb):
         if not self.dark_boost:
@@ -188,7 +184,6 @@ class ScreenSampler:
         img = self.capture_screen()
         if img is None:
             # Screen capture failed, use last color
-            print("Screen capture unavailable, reusing last color.")
             return self.last_color.copy()
         hsv, img_cropped = self.process_image(img)
         rgb = self.weighted_mean_color(hsv, img_cropped)
@@ -198,10 +193,7 @@ class ScreenSampler:
         return rgb
 
     def get_screen_data(self, regions=3):
-        """
-        Returns tuple: (final_color, region_colors, region_weights)
-        final_color is smoothed; region_colors are processed (boost+desat) but unsmoothed.
-        """
+        """Return (final_color, region_colors, region_weights) for spatial bias logic."""
         img = self.capture_screen()
         if img is None:
             return self.last_color.copy(), [], []
