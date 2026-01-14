@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 import sys
 import os
+from unittest import mock
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from screen.screen_sampler import ScreenSampler
 from audio.audio_fft import AudioFFT
@@ -45,6 +46,10 @@ class TestScreenSampler(unittest.TestCase):
 
 class TestAudioFFT(unittest.TestCase):
     def setUp(self):
+        # Avoid opening real audio devices during unit tests.
+        patcher = mock.patch.object(AudioFFT, '_init_stream', lambda self: None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.audio = AudioFFT()
 
     def test_audio_unavailable_zero_motion(self):
