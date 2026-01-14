@@ -15,6 +15,24 @@
 #define SERIAL_BAUD    115200
 #define STATE_SAVE_FILE "/mode.dat"
 
+// Fallback behavior (used when UDP packets stop)
+// Keep these as plain integers (not uint8_t) so they are safe in preprocessor math.
+#ifndef FALLBACK_MODE
+#define FALLBACK_MODE 4
+#endif
+#ifndef FALLBACK_R
+#define FALLBACK_R 255
+#endif
+#ifndef FALLBACK_G
+#define FALLBACK_G 180
+#endif
+#ifndef FALLBACK_B
+#define FALLBACK_B 80
+#endif
+#ifndef FALLBACK_BRIGHTNESS
+#define FALLBACK_BRIGHTNESS 255
+#endif
+
 // Safety color clamp
 #define MAX_R 255
 #define MAX_G 255

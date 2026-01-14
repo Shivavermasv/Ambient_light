@@ -18,16 +18,19 @@ static uint8_t stableDirection = 128;
 static uint8_t dirStableCount = 0;
 
 void initState() {
-    targetState = {FALLBACK_MODE,
-                   static_cast<uint8_t>(FALLBACK_R),
-                   static_cast<uint8_t>(FALLBACK_G),
-                   static_cast<uint8_t>(FALLBACK_B),
-                   static_cast<uint8_t>(FALLBACK_BRIGHTNESS),
-                   0,
-                   0,
-                   128};
-    renderState.render_color = {FALLBACK_R, FALLBACK_G, FALLBACK_B};
-    renderState.render_brightness = FALLBACK_BRIGHTNESS;
+    targetState.mode = static_cast<uint8_t>(FALLBACK_MODE);
+    targetState.r = static_cast<uint8_t>(FALLBACK_R);
+    targetState.g = static_cast<uint8_t>(FALLBACK_G);
+    targetState.b = static_cast<uint8_t>(FALLBACK_B);
+    targetState.brightness = static_cast<uint8_t>(FALLBACK_BRIGHTNESS);
+    targetState.motion_energy = 0;
+    targetState.motion_speed = 0;
+    targetState.motion_direction = 128;
+
+    renderState.render_color.r = float(FALLBACK_R);
+    renderState.render_color.g = float(FALLBACK_G);
+    renderState.render_color.b = float(FALLBACK_B);
+    renderState.render_brightness = float(FALLBACK_BRIGHTNESS);
     renderState.render_motion_energy = 0;
     renderState.render_phase = 0;
 }
