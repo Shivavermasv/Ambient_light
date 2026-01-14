@@ -11,6 +11,8 @@ Usage:
 
 import argparse
 import time
+import json
+import traceback
 
 import numpy as np
 
@@ -154,6 +156,7 @@ def main():
     ap.add_argument('--seconds', type=float, default=180.0)
     ap.add_argument('--fps', type=float, default=25.0)
     ap.add_argument('--spatial-bias', action='store_true', help='Simulate spatial bias + direction hysteresis (like main_desktop.py).')
+    ap.add_argument('--json-out', type=str, default='', help='Optional path to write a JSON summary of the run.')
     args = ap.parse_args()
 
     cfg = Config()
@@ -192,60 +195,89 @@ def main():
     stable_dom_idx = None
     stable_frames_required = 3
 
-    while time.time() < end:
-        now = time.time()
-        t = args.seconds - (end - now)
+    error = None
+    started = time.time()
+    try:
+        while time.time() < end:
+            now = time.time()
+            t = args.seconds - (end - now)
 
-        img = make_frame_pattern(t)
-        if args.spatial_bias and getattr(cfg, 'enable_spatial_bias', False):
-            color, direction, last_dom_idx, dom_streak, stable_dom_idx = run_sampler_with_spatial_bias(
-                sampler,
-                img,
-                regions=int(getattr(cfg, 'spatial_regions', 3)),
-                blend=float(getattr(cfg, 'spatial_bias_blend', 0.35)),
-                stable_frames_required=stable_frames_required,
-                last_dom_idx=last_dom_idx,
-                dom_streak=dom_streak,
-                stable_dom_idx=stable_dom_idx,
-            )
-        else:
-            color = run_sampler_on_frame(sampler, img)
-            direction = 128
+            img = make_frame_pattern(t)
+            if args.spatial_bias and getattr(cfg, 'enable_spatial_bias', False):
+                color, direction, last_dom_idx, dom_streak, stable_dom_idx = run_sampler_with_spatial_bias(
+                    sampler,
+                    img,
+                    regions=int(getattr(cfg, 'spatial_regions', 3)),
+                    blend=float(getattr(cfg, 'spatial_bias_blend', 0.35)),
+                    stable_frames_required=stable_frames_required,
+                    last_dom_idx=last_dom_idx,
+                    dom_streak=dom_streak,
+                    stable_dom_idx=stable_dom_idx,
+                )
+            else:
+                color = run_sampler_on_frame(sampler, img)
+                direction = 128
 
-        delta = np.abs(color - last_color).sum()
-        screen_motion = float(np.clip(delta * 0.8, 0, 180))
-        motion_value = float(motion_alpha * screen_motion + (1 - motion_alpha) * motion_value)
-        last_color = color
+            delta = np.abs(color - last_color).sum()
+            screen_motion = float(np.clip(delta * 0.8, 0, 180))
+            motion_value = float(motion_alpha * screen_motion + (1 - motion_alpha) * motion_value)
+            last_color = color
 
-        # Synthetic audio features
-        audio_energy = 120.0 * abs(np.sin(2 * np.pi * t / 2.5))
-        audio_centroid = 300.0 + 2500.0 * (0.5 + 0.5 * np.sin(2 * np.pi * t / 7.0))
+            # Synthetic audio features
+            audio_energy = 120.0 * abs(np.sin(2 * np.pi * t / 2.5))
+            audio_centroid = 300.0 + 2500.0 * (0.5 + 0.5 * np.sin(2 * np.pi * t / 7.0))
 
-        base = {
-            'base_color': color,
-            'screen_motion_energy': motion_value,
-            'audio_motion_energy': audio_energy,
-            'audio_centroid': audio_centroid,
-            'direction': direction,
+            base = {
+                'base_color': color,
+                'screen_motion_energy': motion_value,
+                'audio_motion_energy': audio_energy,
+                'audio_centroid': audio_centroid,
+                'direction': direction,
+            }
+
+            for mode in (1, 2, 3, 4, 5):
+                d = dict(base)
+                d['mode'] = mode
+                pkt = mm.build_packet(d)
+                validate_packet(pkt)
+                packets += 1
+
+            if now - last_print > 5.0:
+                rgb_list = [int(x) for x in np.round(color).astype(int).tolist()]
+                print(
+                    f"t={t:6.1f}s color={rgb_list} dir={int(direction)} "
+                    f"screen_motion={motion_value:6.1f} audio={audio_energy:6.1f} packets={packets}"
+                )
+                last_print = now
+
+            time.sleep(dt)
+    except Exception as e:
+        error = str(e)
+        print("ERROR:")
+        traceback.print_exc()
+
+    elapsed_s = time.time() - started
+    ok = error is None
+    print(f"DONE. ok={ok} seconds={args.seconds} fps={args.fps} spatial_bias={bool(args.spatial_bias)} total_packets={packets} elapsed_s={elapsed_s:.2f}")
+
+    if args.json_out:
+        summary = {
+            "ok": ok,
+            "error": error,
+            "seconds": float(args.seconds),
+            "fps": float(args.fps),
+            "spatial_bias": bool(args.spatial_bias),
+            "total_packets": int(packets),
+            "elapsed_s": float(elapsed_s),
         }
+        try:
+            with open(args.json_out, "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=2)
+        except Exception:
+            print("WARN: failed to write json summary")
 
-        for mode in (1, 2, 3, 4, 5):
-            d = dict(base)
-            d['mode'] = mode
-            pkt = mm.build_packet(d)
-            validate_packet(pkt)
-            packets += 1
-
-        if now - last_print > 5.0:
-            print(
-                f"t={t:6.1f}s color={list(np.round(color).astype(int))} dir={int(direction)} "
-                f"screen_motion={motion_value:6.1f} audio={audio_energy:6.1f} packets={packets}"
-            )
-            last_print = now
-
-        time.sleep(dt)
-
-    print(f"DONE. seconds={args.seconds} fps={args.fps} total_packets={packets}")
+    if not ok:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
